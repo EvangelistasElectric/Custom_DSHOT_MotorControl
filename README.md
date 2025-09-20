@@ -91,7 +91,7 @@ void loop() {
 ```
 ## 🎯 Default Demo Sequence
 The default sequence matches the inertia-wheel test plan:
-
+```
 1️⃣ Ramp to 3000 RPM (5 s)
 2️⃣ Hold 3000 (5 s)
 3️⃣ Drop to 1500 RPM (30 ms)
@@ -107,7 +107,7 @@ The default sequence matches the inertia-wheel test plan:
 1️⃣3️⃣ Drop to 4500 RPM (30 ms)
 1️⃣4️⃣ Hold 4500 (5 s)
 1️⃣5️⃣ Ramp down to 0 RPM (5 s)
-
+```
 Looping is enabled by default (setLoop(true)), disable for one-shot runs.
 
 📚 API Reference
