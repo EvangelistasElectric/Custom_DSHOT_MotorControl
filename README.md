@@ -11,7 +11,6 @@ Ideal for **ESC/motor characterization** with inertia wheels, bench testing, and
 This project is licensed under the **Evangelista's Electric Non-Commercial Open Source License (EENOSL), Version 1.0**.  
 
 - ✅ Free for **personal, educational, and research** use  
-- 🚫 No commercial use without prior written consent  
 
 See the [LICENSE](./LICENSE) file for full details.  
 
