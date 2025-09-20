@@ -89,7 +89,7 @@ void loop() {
   esc1.tick();               // run control + telemetry + DShot @ 1kHz
 }
 ```
-##🎯 Default Demo Sequence
+## 🎯 Default Demo Sequence
 The default sequence matches the inertia-wheel test plan:
 
 1️⃣ Ramp to 3000 RPM (5 s)
@@ -145,7 +145,7 @@ public:
 };
 ```
 
-##📊 Tuning Guide
+## 📊 Tuning Guide
 Anchors: Run steady RPMs, measure µs, update via setAnchors().
 
 Slew limit: Raise (e.g., 12k–40k µs/s) for rapid 30 ms transitions.
@@ -158,7 +158,7 @@ EMA & spike gate: Lower α or increase gate fraction if telemetry is noisy.
 
 Profiler output: Check rise90, settle, overshoot values to tune.
 
-##⚠️ Safety Notes
+## ⚠️ Safety Notes
 ❌ Never spin with props; use safe inertia wheels.
 
 🔌 Confirm wiring & ground before powering.
@@ -169,7 +169,7 @@ Profiler output: Check rise90, settle, overshoot values to tune.
 
 🌡️ Add current/thermal cutbacks in real runs.
 
-##🛠️ Troubleshooting
+## 🛠️ Troubleshooting
 No spin: Check arm, pin wiring, ESC supports DShot600.
 
 Garbage telemetry: Try other baud, enable auto scan, check T wire → RX pin.
@@ -178,7 +178,7 @@ Choppy response: Slew limit too low.
 
 Overshoot: Reduce KP/KI or tweak EMA.
 
-##📂 Project Structure
+## 📂 Project Structure
 bash
 Copy code
 lib/
