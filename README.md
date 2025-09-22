@@ -62,12 +62,14 @@ See the [LICENSE](./LICENSE) file for full details.
 ## 🚀 Getting Started
 1. **Drop-in**  
 lib/
+
 └── dshot_MotorControl.h
 src/
+
 └── main.ino
 
 
-2. **Wire it**  
+3. **Wire it**  
 - ESC signal → Teensy pin  
 - ESC telemetry T → Teensy Serial RX pin  
 - Share ground  
@@ -181,9 +183,11 @@ Overshoot: Reduce KP/KI or tweak EMA.
 # 📂 Project Structure
 
 lib/
+
  └── dshot_MotorControl.h   # the entire library (header-only)
  
 src/
+
  └── main.ino               # example sketch
  
 README.md                   # this file
