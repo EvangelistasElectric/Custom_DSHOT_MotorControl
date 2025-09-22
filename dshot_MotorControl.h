@@ -1,8 +1,160 @@
+/**
+ * @file    dshot_MotorControl.h
+ * @author  Matthew Evangelista
+ * @date    2025-09-22
+ * @version 1.0
+ *
+ * @brief
+ * Teensy 4.0 + APD 40F3 ESC control using DShot600 at 1 kHz with UART telemetry.
+ * Provides a modular, header-only motor controller with feed-forward + PI control,
+ * slew limiting, telemetry averaging, and a built-in response-time profiler.
+ *
+ * @section Overview
+ * - Protocol: DShot600 (digital throttle) at 1 kHz packet cadence.
+ * - Target MCU: Teensy 4.0 (600 MHz) for precise nanosecond timing.
+ * - ESC: APD 40F3 (tested) with 10-byte UART telemetry frames (V, A, Temp, RPM, mAh).
+ * - Control: feed-forward mapping (us vs. RPM) + PI loop with anti-windup and slew limit.
+ * - Telemetry: EMA-filtered RPM with spike gating; averaged V/A/T/eRPM/mRPM between prints.
+ * - Timeline: parametric DemoSequence to define ramp/hold steps in ms and target RPM.
+ * - Profiling: rise90, settle band, overshoot estimation, step detector, per-instance.
+ *
+ * @section Features
+ * 1) DemoSequence:
+ *    - Build a composite test sequence from {duration_ms, target_rpm} points.
+ *    - Linear interpolation between points; looped or single-shot operation.
+ *    - Default sequence includes 0->3000 ramp and 4500/6000/7500 step checks.
+ *
+ * 2) MotorController<ESC_PIN>:
+ *    - DShot600 bit-banging with exact high/low intervals (ns resolution).
+ *    - 1 kHz packet stream; per-packet optional telemetry request bit.
+ *    - Anchored us-to-RPM mapping (two-point affine) with clamping.
+ *    - PI controller with anti-windup (KAW), integral clamp, and sign-change damp.
+ *    - Slew limiting in microseconds per second to enforce smooth throttle motion.
+ *    - Telemetry decode (CRC-8 0x07) and accumulation for print-period averages.
+ *    - EMA filtered mechRPM with dynamic spike gate vs target/filt RPM.
+ *    - Built-in response profiler for step changes >= STEP_DETECT_THRESH_RPM.
+ *
+ * @section Wiring
+ * - ESC DShot signal: connect to Teensy pin ESC_PIN (template parameter).
+ * - ESC Telemetry (T pin): connect to Teensy HW serial RX (e.g., Serial1 RX1).
+ * - Common ground between battery/ESC and Teensy.
+ * - Ensure voltage-level compatibility (APD signal input tolerant at 3.3 V logic).
+ *
+ * @section Timing
+ * - PACKET_PERIOD_US       = 1000 us (1 kHz command cadence).
+ * - DSHOT600_BIT_TIME_NS   = 1670 ns total per bit.
+ * - DSHOT600_ONE_HIGH_NS   = 1250 ns high for logical 1.
+ * - DSHOT600_ZERO_HIGH_NS  = 830 ns high for logical 0.
+ * - PRINT_PERIOD_MS        = 15 ms averaged telemetry print cadence.
+ * - SETTLE_HOLD_US         = 50,000 us dwell inside band to mark settle.
+ *
+ * @section Telemetry_Format
+ * APD UART 10-byte frame (validated by CRC-8 poly 0x07 over first 9 bytes):
+ *   [0]  int8  : Temp_C
+ *   [1]  uint8 : V_H
+ *   [2]  uint8 : V_L         -> Volts = ((V_H<<8)|V_L) / 100.0
+ *   [3]  uint8 : I_H
+ *   [4]  uint8 : I_L         -> Amps  = ((I_H<<8)|I_L) / 100.0
+ *   [5]  uint8 : mAh_H
+ *   [6]  uint8 : mAh_L       -> mAh   = ((mAh_H<<8)|mAh_L)
+ *   [7]  uint8 : RPM_H
+ *   [8]  uint8 : RPM_L       -> eRPM  = ((RPM_H<<8)|RPM_L) * 100.0
+ *   [9]  uint8 : CRC-8(0x07)
+ * mechRPM = eRPM / MOTOR_POLE_PAIRS.
+ *
+ * @section Control_Loop
+ * - Feed-forward: rpmToUs_() via two anchors (RPM_A, US_A) and (RPM_B, US_B).
+ * - Proportional: KP_US_PER_RPM * error.
+ * - Integral: KI_US_PER_RPM_PER_S * error integrated with anti-windup KAW and clamp.
+ * - Saturation: output clamped to [MIN_US, MAX_US]; slew limit applied per packet.
+ * - Filtering: EMA on mechRPM; large spikes suppressed with dynamic gate vs target/filt.
+ *
+ * @section Response_Profiler
+ * Triggered when |target change| >= STEP_DETECT_THRESH_RPM.
+ * Tracks:
+ *   - Rise90 time: first crossing of 90% of step amplitude.
+ *   - Settle time: first entry into +/-BAND_PCT band around target that remains for SETTLE_HOLD_US.
+ *   - Overshoot: peak excursion relative to step amplitude (up or down).
+ * Emits a single "RESP:" line to Serial when settle is marked.
+ *
+ * @section API_Summary
+ * DemoSequence
+ *   - build({{ms, rpm}, ...}, loop)     : initialize sequence
+ *   - addPoint(ms, rpm)                 : append a segment end-point
+ *   - setLoop(bool) / loop()            : enable/disable repeating cycle
+ *   - cycleMs()                         : total cycle duration (ms)
+ *   - targetAt(ms_into_cycle)           : interpolated target RPM
+ *
+ * MotorController<ESC_PIN>
+ *   - ctor(HardwareSerial& tlm, const char* name="SerialX")
+ *   - begin()                           : init serial, arm ESC, start cycle clock
+ *   - tick()                            : call from loop() at ~1 kHz cadence
+ *   - setSequence(DemoSequence)         : change the test timeline
+ *   - setLoop(bool)                     : toggle looping
+ *   - cycleMs()                         : expose sequence cycle length
+ *   - setAnchors(rpmA, usA, rpmB, usB)  : calibrate mapping
+ *   - setSlewLimit(us_per_s)            : throttle slew constraint
+ *   - enableTelemetryScan(bool)         : optional baud scan (rotates a small set)
+ *   - setTelemetryBaud(unsigned)        : fixed baud if known
+ *
+ * @section Example
+ * // Teensy 4.0, ESC signal on pin 4, telemetry on Serial1
+ * #include "dshot_MotorControl.h"
+ *
+ * // ESC on pin 4
+ * MotorController<4> motor(Serial1, "Serial1");
+ *
+ * void setup() {
+ *   motor.begin();
+ *   // Optional: anchors for your ESC/motor pair (RPM vs microseconds mapping)
+ *   motor.setAnchors(2000.0f, 1310, 6400.0f, 1795);
+ *   // Optional: custom sequence
+ *   auto seq = makeDefaultSequence(true);
+ *   motor.setSequence(seq);
+ * }
+ *
+ * void loop() {
+ *   motor.tick(); // run control + send DShot + process telemetry + print avg
+ * }
+ *
+ * @section Configuration_Tuning
+ * - Anchors: setAnchors(rpmA, usA, rpmB, usB) should be measured for your hardware.
+ * - Gains: KP_US_PER_RPM, KI_US_PER_RPM_PER_S, KAW, I_CLAMP_US tune tracking vs stability.
+ * - Feed-forward offset: FF_OFFSET_US can remove static bias under load.
+ * - Slew: setSlewLimit(us_per_s) to constrain acceleration for large steps.
+ * - Filtering: EMA_ALPHA, spike gate params balance noise rejection vs responsiveness.
+ * - Profiler: STEP_DETECT_THRESH_RPM, BAND_PCT, SETTLE_HOLD_US define response metrics.
+ *
+ * @section Logging
+ * Periodic print (every PRINT_PERIOD_MS) shows time within cycle and averaged telemetry
+ * since last print, e.g.:
+ *   t=12s  targetRPM=6000  us=1732->thr=1024  |  V=11.10  A=8.25  Temp=33.0C
+ *   eRPM=84000  mechRPM=6000  mAh=40  n=18
+ * Where n is the number of telemetry frames averaged since the last print.
+ *
+ * @section Known_Limits
+ * - The print/log interval may mask sub-interval dynamics. Faster logging can expose
+ *   overshoot and packet-timing variability; telemetry may appear noisier even when
+ *   control remains stable. Control performance is governed by the 1 kHz command loop.
+ * - DShot timings assume Teensy 4.x clocking; porting to other MCUs requires retiming.
+ * - ESC telemetry format and scaling are specific to APD implementation tested here.
+ *
+ * @section Safety
+ * - Spin-up is hazardous. Secure the motor and any inertia loads. Keep clear of props.
+ * - Verify common ground and correct polarity. Use proper supply and current limits.
+ * - Do not exceed ESC/motor ratings. Monitor temperature and current draw.
+ *
+ * @section License
+ * This source is released under the Evangelista's Electric Non-Commercial Open Source
+ * License (EENOSL) v1.0. See LICENSE for terms. Commercial use requires prior consent.
+ *
+ * @section Change_Log
+ * - 2025-09-22: Initial public header-only release with DemoSequence, PI loop, telemetry,
+ *               response profiler, and default 15-step sequence.
+ */
+
+
 #pragma once
-// Teensy 4.0 — APD 40F3 DShot600 @1kHz + UART Telemetry
-// Modular, multi-controller version.
-// - DemoSequence: build ramp/hold timeline from points {duration_ms, rpm}.
-// - MotorController<ESC_PIN>: fully encapsulated ESC + telemetry + PI loop.
 
 #include <Arduino.h>
 #include <math.h>
@@ -112,7 +264,7 @@ public:
   static constexpr float KI_US_PER_RPM_PER_S  = 0.030f;
   static constexpr float I_CLAMP_US           = 120.0f;
   static constexpr float KAW                  = 0.20f;
-  static constexpr int   FF_OFFSET_US         = 25;
+  static constexpr int   FF_OFFSET_US         = -110;
 
   static constexpr float EMA_ALPHA            = 0.20f;
   static constexpr float MIN_SPIKE_GATE_RPM   = 800.0f;
@@ -485,4 +637,3 @@ private:
   // motor config
   static constexpr int MOTOR_POLE_PAIRS = 14; // BrotherHobby Avenger 2806.5
 };
-
