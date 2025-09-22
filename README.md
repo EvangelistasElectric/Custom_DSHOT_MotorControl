@@ -179,11 +179,13 @@ Choppy response: Slew limit too low.
 Overshoot: Reduce KP/KI or tweak EMA.
 
 # 📂 Project Structure
-bash
-Copy code
+
 lib/
  └── dshot_MotorControl.h   # the entire library (header-only)
+ 
 src/
  └── main.ino               # example sketch
+ 
 README.md                   # this file
+
 LICENSE                     # custom EENOSL v1.0 license
