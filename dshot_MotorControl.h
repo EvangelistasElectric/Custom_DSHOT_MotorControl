@@ -1,7 +1,7 @@
 /**
- * @file    dshot_MotorControl.h
- * @author  Matthew Evangelista
- * @date    2025-09-22
+ * File:    dshot_MotorControl.h
+ * Author:  Matthew Evangelista
+ * Date:    2025-09-22
  *
  * Teensy 4.0 control of APD 40F3 ESC using DShot600 @1 kHz with UART telemetry.
  * Provides a header-only MotorController with feed-forward + PI loop, slew limit,
