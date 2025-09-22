@@ -61,6 +61,7 @@ See the [LICENSE](./LICENSE) file for full details.
 
 ## 🚀 Getting Started
 1. **Drop-in**  
+```
 lib/
 
     └── dshot_MotorControl.h
@@ -68,7 +69,7 @@ lib/
 src/
 
   └── main.ino
-
+```
 
 3. **Wire it**  
 - ESC signal → Teensy pin  
@@ -182,7 +183,7 @@ Choppy response: Slew limit too low.
 Overshoot: Reduce KP/KI or tweak EMA.
 
 # 📂 Project Structure
-
+```
 lib/
 
     └── dshot_MotorControl.h   # the entire library (header-only)
@@ -194,3 +195,4 @@ src/
 README.md                   # this file
 
 LICENSE                     # custom EENOSL v1.0 license
+```
