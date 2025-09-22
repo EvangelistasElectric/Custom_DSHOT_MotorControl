@@ -63,12 +63,10 @@ See the [LICENSE](./LICENSE) file for full details.
 1. **Drop-in**  
 ```
 lib/
-
-    └── dshot_MotorControl.h
+   └── dshot_MotorControl.h
    
 src/
-
-  └── main.ino
+   └── main.ino
 ```
 
 3. **Wire it**  
@@ -185,14 +183,11 @@ Overshoot: Reduce KP/KI or tweak EMA.
 # 📂 Project Structure
 ```
 lib/
-
-    └── dshot_MotorControl.h   # the entire library (header-only)
+   └── dshot_MotorControl.h   # the entire library (header-only)
  
 src/
-
    └── main.ino               # example sketch
  
-README.md                   # this file
-
-LICENSE                     # custom EENOSL v1.0 license
+README.md                     # this file
+LICENSE                       # custom EENOSL v1.0 license
 ```
